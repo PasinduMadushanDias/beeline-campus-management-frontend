@@ -112,28 +112,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-white/10">
-            <p className="text-xs text-slate-500 text-center mb-3">Default test credentials</p>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: "Admin", user: "admin" },
-                { label: "Teacher", user: "teacher" },
-                { label: "Staff", user: "staff" },
-                { label: "Student", user: "student" },
-              ].map((cred) => (
-                <button
-                  key={cred.user}
-                  type="button"
-                  onClick={() => { setUsername(cred.user); setPassword("123"); setError(""); }}
-                  className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs text-slate-400 hover:text-slate-300 transition-colors cursor-pointer"
-                >
-                  <span className="font-medium text-slate-300">{cred.label}</span>
-                  <span className="block text-slate-500 mt-0.5">{cred.user} / 123</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         <p className="text-center text-xs text-slate-600 mt-6">&copy; 2026 Beeline Advanced Diploma in English</p>
