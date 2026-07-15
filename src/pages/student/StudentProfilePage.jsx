@@ -3,8 +3,9 @@ import { UserCircle2, IdCard, MapPin, Phone, Mail, Cake, VenetianMask, Building2
 import { useAuth } from "../../context/AuthContext";
 import { PageHeader, Card, StatusBadge, BranchBadge } from "../../components/shared";
 import QRStickerModal from "../../components/shared/QRStickerModal";
+import { API_BASE_URL } from "../../config/api";
 
-const API = "http://localhost:8080/api/v1/student";
+const API = `${API_BASE_URL}/student`;
 
 const GENDER_LABELS = { MALE: "Male", FEMALE: "Female", OTHER: "Other" };
 

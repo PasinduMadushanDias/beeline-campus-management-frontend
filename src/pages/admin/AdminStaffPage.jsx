@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Users, Plus, X, Pencil, Trash2, AlertCircle, Save, Search } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { PageHeader, Card, InputField, SelectField, BranchBadge, StatusBadge, SuccessToast, EmptyState } from "../../components/shared";
+import { API_BASE_URL } from "../../config/api";
 
-const API = "http://localhost:8080/api/v1/admin";
+const API = `${API_BASE_URL}/admin`;
 
 export default function AdminStaffPage() {
   const { staffMembers, branches, fetchStaff } = useAppContext();

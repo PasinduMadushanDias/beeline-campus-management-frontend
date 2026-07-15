@@ -5,8 +5,9 @@ import {
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { PageHeader, Card, SuccessToast } from "../../components/shared";
+import { API_BASE_URL } from "../../config/api";
 
-const API = "http://localhost:8080/api/v1/admin";
+const API = `${API_BASE_URL}/admin`;
 
 const BRANCH_COLORS = [
   { value: "blue", bg: "bg-blue-500", ring: "ring-blue-500" },

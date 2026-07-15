@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback } from "react";
+import { API_BASE_URL } from "../config/api";
 
 const AuthContext = createContext(null);
 const SESSION_KEY = "beeline_auth_user";
@@ -19,7 +20,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(loadStoredUser);
 
   const login = useCallback(async (username, password) => {
-    const res = await fetch("http://localhost:8080/api/v1/auth/login", {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),

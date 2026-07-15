@@ -6,8 +6,9 @@ import { PageHeader, Card, BranchBadge, MetricCard, SuccessToast } from "../../c
 import QRAttendanceScanner from "../../components/shared/QRAttendanceScanner";
 import { parseQrPayload } from "../../utils/qrPayload";
 import { Html5Qrcode } from "html5-qrcode";
+import { API_BASE_URL } from "../../config/api";
 
-const API = "http://localhost:8080/api/v1";
+const API = API_BASE_URL;
 
 export default function StaffAttendancePage() {
   const { branches, students, fetchStudents, attendance, fetchAttendance } = useAppContext();

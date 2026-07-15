@@ -3,8 +3,9 @@ import { GraduationCap, UserPlus, Search, Filter, Plus, X, DollarSign, Pencil, T
 import { useAppContext } from "../../context/AppContext";
 import { PageHeader, Card, InputField, SelectField, BranchBadge, StatusBadge, SuccessToast, EmptyState } from "../../components/shared";
 import QRStickerModal from "../../components/shared/QRStickerModal";
+import { API_BASE_URL } from "../../config/api";
 
-const API = "http://localhost:8080/api/v1/admin";
+const API = `${API_BASE_URL}/admin`;
 
 const GENDER_OPTIONS = [
   { value: "MALE", label: "Male" },

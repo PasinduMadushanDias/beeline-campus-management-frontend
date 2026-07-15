@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { BookOpen, Plus, X, Send, Filter, Calendar, Trash2, Pencil, AlertTriangle } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { PageHeader, Card, BranchBadge, SuccessToast, EmptyState } from "../../components/shared";
+import { API_BASE_URL } from "../../config/api";
 
-const API = "http://localhost:8080/api/v1";
+const API = API_BASE_URL;
 
 export default function AdminHomeworkPage() {
   const { branches, homeworkTasks, fetchHomeworkTasks } = useAppContext();

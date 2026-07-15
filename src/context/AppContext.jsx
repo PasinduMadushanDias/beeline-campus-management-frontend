@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { INITIAL_ANNOUNCEMENTS } from "../constants";
+import { API_BASE_URL } from "../config/api";
 
-const API = "http://localhost:8080/api/v1";
+const API = API_BASE_URL;
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {

@@ -5,8 +5,9 @@ import { useAuth } from "../../context/AuthContext";
 import { PageHeader, Card, BranchBadge, SuccessToast, EmptyState, MetricCard } from "../../components/shared";
 import QRAttendanceScanner from "../../components/shared/QRAttendanceScanner";
 import { parseQrPayload } from "../../utils/qrPayload";
+import { API_BASE_URL } from "../../config/api";
 
-const API = "http://localhost:8080/api/v1";
+const API = API_BASE_URL;
 
 export default function StaffHomeworkPage() {
   const { fetchHomeworkByBranchDate } = useAppContext();
