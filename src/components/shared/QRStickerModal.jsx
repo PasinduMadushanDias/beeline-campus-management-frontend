@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { X, Printer, Download } from "lucide-react";
+import { CAMPUS_CODE } from "../../constants/campus";
 
 export default function QRStickerModal({ student, onClose }) {
   const canvasWrapRef = useRef(null);
@@ -11,7 +12,10 @@ export default function QRStickerModal({ student, onClose }) {
   // Matara's A01 can coexist), so the QR payload must include branchId to
   // stay globally unique and unambiguous when scanned. branchId is used
   // instead of branchName since branch names could be renamed later.
-  const qrValue = `${student.branchId}-${student.studentIdNo}`;
+  // CAMPUS_CODE is prepended to prevent collisions if this codebase is ever
+  // deployed as separate, independent campus instances (different DBs) —
+  // without it, two deployments could generate identical payloads.
+  const qrValue = `${CAMPUS_CODE}-${student.branchId}-${student.studentIdNo}`;
 
   const handleDownload = () => {
     const qrCanvas = canvasWrapRef.current?.querySelector("canvas");

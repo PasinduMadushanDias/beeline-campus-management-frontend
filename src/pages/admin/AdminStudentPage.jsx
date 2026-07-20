@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { GraduationCap, UserPlus, Search, Filter, Plus, X, DollarSign, Pencil, Trash2, AlertCircle, Save, QrCode, Loader2, Hash } from "lucide-react";
+import { GraduationCap, UserPlus, Search, Filter, Plus, X, DollarSign, Pencil, Trash2, AlertCircle, Save, QrCode, Loader2, Hash, KeyRound, Check } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { PageHeader, Card, InputField, SelectField, BranchBadge, StatusBadge, SuccessToast, EmptyState } from "../../components/shared";
 import QRStickerModal from "../../components/shared/QRStickerModal";
@@ -33,6 +33,13 @@ export default function AdminStudentPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [qrStudent, setQrStudent] = useState(null);
+
+  // Inline "Reset Password" popover state — which row's popover is open, its
+  // draft value, and a per-request busy flag (mirrors the `submitting` pattern
+  // used for the main form, scoped to whichever row is currently resetting).
+  const [resetPasswordId, setResetPasswordId] = useState(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [resettingId, setResettingId] = useState(null);
 
   // NEW: live Student ID preview for the selected branch
   const [previewedId, setPreviewedId] = useState(null);
@@ -176,6 +183,33 @@ export default function AdminStudentPage() {
     setEditingId(s.id);
     setShowForm(true);
     setDeleteConfirm(null);
+  };
+
+  const handleResetPassword = async (id, e) => {
+    e?.stopPropagation();
+    if (resetPasswordValue.length < 4) {
+      toast("Error: Password must be at least 4 characters long");
+      return;
+    }
+    setResettingId(id);
+    try {
+      const res = await fetch(`${API}/students/${id}/reset-password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword: resetPasswordValue }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to reset password");
+      }
+      toast("Password reset successfully!");
+      setResetPasswordId(null);
+      setResetPasswordValue("");
+    } catch (err) {
+      toast(`Error: ${err.message}`);
+    } finally {
+      setResettingId(null);
+    }
   };
 
   const handleDelete = async (id, e) => {
@@ -323,9 +357,34 @@ export default function AdminStudentPage() {
                         <button onClick={(e) => handleDelete(s.id, e)} className="px-2.5 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 cursor-pointer">Yes</button>
                         <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null); }} className="px-2.5 py-1.5 bg-slate-100 text-slate-600 text-xs rounded-lg hover:bg-slate-200 cursor-pointer">No</button>
                       </div>
+                    ) : resetPasswordId === s.id ? (
+                      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          autoFocus
+                          value={resetPasswordValue}
+                          onChange={(e) => setResetPasswordValue(e.target.value)}
+                          placeholder="New password"
+                          className="w-32 px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        />
+                        <button
+                          onClick={(e) => handleResetPassword(s.id, e)}
+                          disabled={resettingId === s.id}
+                          className="px-2.5 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 cursor-pointer flex items-center gap-1"
+                        >
+                          {resettingId === s.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Save
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setResetPasswordId(null); setResetPasswordValue(""); }}
+                          className="px-2.5 py-1.5 bg-slate-100 text-slate-600 text-xs rounded-lg hover:bg-slate-200 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     ) : (
                       <div className="flex items-center justify-end gap-1.5">
                         <button onClick={(e) => { e.stopPropagation(); setQrStudent(s); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer" title="View QR Sticker"><QrCode size={14} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setResetPasswordId(s.id); setResetPasswordValue(""); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer" title="Reset Password"><KeyRound size={14} /></button>
                         <button onClick={(e) => startEdit(s, e)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer" title="Edit"><Pencil size={14} /></button>
                         <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(s.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" title="Delete"><Trash2 size={14} /></button>
                       </div>
