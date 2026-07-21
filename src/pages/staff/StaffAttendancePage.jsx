@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { CalendarCheck, CheckCircle2, XCircle, Filter, Plus, X, Search, Send, ScanLine } from "lucide-react";
+import { CalendarCheck, CheckCircle2, XCircle, Filter, Plus, X, Search, Send, ScanLine, Fingerprint } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
 import { PageHeader, Card, BranchBadge, MetricCard, SuccessToast } from "../../components/shared";
 import QRAttendanceScanner from "../../components/shared/QRAttendanceScanner";
+import FingerprintScanner from "../../components/shared/FingerprintScanner";
 import { parseQrPayload } from "../../utils/qrPayload";
 import { Html5Qrcode } from "html5-qrcode";
 import { API_BASE_URL } from "../../config/api";
@@ -18,7 +19,8 @@ export default function StaffAttendancePage() {
   const [branchFilter, setBranchFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [mode, setMode] = useState("manual"); // "manual" | "scan"
+  const [mode, setMode] = useState("manual"); // "manual" | "scan" | "fingerprint"
+  const [fpBranchId, setFpBranchId] = useState("");
   // selectedStudentId holds the student's unique numeric id (not studentIdNo, which
   // is only unique per branch and can collide across branches in the dropdown).
   const [form, setForm] = useState({ selectedStudentId: "", date: new Date().toISOString().slice(0, 10), present: true });
@@ -27,6 +29,10 @@ export default function StaffAttendancePage() {
   useEffect(() => {
     fetchStudents();
   }, [fetchStudents]);
+
+  useEffect(() => {
+    if (!fpBranchId && branches.length > 0) setFpBranchId(branches[0].id.toString());
+  }, [branches, fpBranchId]);
   const [submitting, setSubmitting] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
   const [toast, setToast] = useState("");
@@ -111,6 +117,38 @@ export default function StaffAttendancePage() {
     }
   };
 
+  const handleFingerprintScan = async ({ imageBase64, dpi }) => {
+    if (!fpBranchId) {
+      showToast("Error: Select a branch first");
+      return;
+    }
+    setScanBusy(true);
+    try {
+      const res = await fetch(`${API}/attendance/mark-by-fingerprint?markedByUserId=${user.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          branchId: parseInt(fpBranchId),
+          imageBase64,
+          dpi,
+          date: new Date().toISOString().slice(0, 10),
+          present: true,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to mark attendance");
+      }
+      const data = await res.json();
+      await refreshTable();
+      showToast(`Marked present: ${data.studentName}`);
+    } catch (err) {
+      showToast(`Error: ${err.message}`);
+    } finally {
+      setScanBusy(false);
+    }
+  };
+
   const present = attendance.filter((a) => a.present).length;
   const absent = attendance.filter((a) => !a.present).length;
 
@@ -140,8 +178,9 @@ export default function StaffAttendancePage() {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-              {mode === "manual" ? <><Send size={18} className="text-indigo-600" /> Mark Attendance by Student ID</>
-                                  : <><ScanLine size={18} className="text-indigo-600" /> Scan Student QR</>}
+              {mode === "manual" && <><Send size={18} className="text-indigo-600" /> Mark Attendance by Student ID</>}
+              {mode === "scan" && <><ScanLine size={18} className="text-indigo-600" /> Scan Student QR</>}
+              {mode === "fingerprint" && <><Fingerprint size={18} className="text-indigo-600" /> Fingerprint Attendance</>}
             </h3>
             <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1">
               <button
@@ -161,6 +200,15 @@ export default function StaffAttendancePage() {
                 }`}
               >
                 <ScanLine size={13} /> Scan QR
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("fingerprint")}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors flex items-center gap-1.5 ${
+                  mode === "fingerprint" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Fingerprint size={13} /> Fingerprint
               </button>
             </div>
           </div>
@@ -209,6 +257,21 @@ export default function StaffAttendancePage() {
               {scanBusy && (
                 <p className="text-xs text-slate-400 text-center mt-2">Marking attendance...</p>
               )}
+            </div>
+          )}
+
+          {mode === "fingerprint" && (
+            <div className="py-2">
+              <div className="flex justify-center mb-2">
+                <select
+                  value={fpBranchId}
+                  onChange={(e) => setFpBranchId(e.target.value)}
+                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                >
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+              <FingerprintScanner active={mode === "fingerprint"} onScan={handleFingerprintScan} busy={scanBusy} />
             </div>
           )}
         </Card>

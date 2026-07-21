@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { GraduationCap, UserPlus, Search, Filter, Plus, X, DollarSign, Pencil, Trash2, AlertCircle, Save, QrCode, Loader2, Hash, KeyRound, Check } from "lucide-react";
+import { GraduationCap, UserPlus, Search, Filter, Plus, X, DollarSign, Pencil, Trash2, AlertCircle, Save, QrCode, Loader2, Hash, KeyRound, Check, Fingerprint } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { PageHeader, Card, InputField, SelectField, BranchBadge, StatusBadge, SuccessToast, EmptyState } from "../../components/shared";
 import QRStickerModal from "../../components/shared/QRStickerModal";
+import FingerprintScanner from "../../components/shared/FingerprintScanner";
 import { API_BASE_URL } from "../../config/api";
 
 const API = `${API_BASE_URL}/admin`;
+const STUDENT_API = `${API_BASE_URL}/student`;
 
 const GENDER_OPTIONS = [
   { value: "MALE", label: "Male" },
@@ -33,6 +35,8 @@ export default function AdminStudentPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [qrStudent, setQrStudent] = useState(null);
+  const [fpStudent, setFpStudent] = useState(null);
+  const [fpSubmitting, setFpSubmitting] = useState(false);
 
   // Inline "Reset Password" popover state — which row's popover is open, its
   // draft value, and a per-request busy flag (mirrors the `submitting` pattern
@@ -224,6 +228,29 @@ export default function AdminStudentPage() {
     }
   };
 
+  const handleFingerprintScan = async ({ imageBase64, dpi }) => {
+    if (!fpStudent) return;
+    setFpSubmitting(true);
+    try {
+      const res = await fetch(`${STUDENT_API}/${fpStudent.id}/fingerprint`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64, dpi }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to enroll fingerprint");
+      }
+      await Promise.all([loadStudents(), refreshGlobalStudents?.()]);
+      toast(`Fingerprint enrolled for ${fpStudent.fullName}`);
+      setFpStudent(null);
+    } catch (err) {
+      toast(`Error: ${err.message}`);
+    } finally {
+      setFpSubmitting(false);
+    }
+  };
+
   const branchOptions = branches.map((b) => ({ value: b.id.toString(), label: `${b.name} (${b.duration || ""})` }));
   const branchFilterOptions = [{ value: "All", label: "All Branches" }, ...branches.map((b) => ({ value: b.id.toString(), label: b.name }))];
   const selectedBranchName = branches.find((b) => b.id.toString() === form.branchId)?.name;
@@ -384,6 +411,15 @@ export default function AdminStudentPage() {
                     ) : (
                       <div className="flex items-center justify-end gap-1.5">
                         <button onClick={(e) => { e.stopPropagation(); setQrStudent(s); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer" title="View QR Sticker"><QrCode size={14} /></button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setFpStudent(s); }}
+                          className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                            s.fingerprintEnrolled ? "text-emerald-500 hover:bg-emerald-50" : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                          }`}
+                          title={s.fingerprintEnrolled ? "Fingerprint enrolled — click to re-enroll" : "Enroll Fingerprint"}
+                        >
+                          <Fingerprint size={14} />
+                        </button>
                         <button onClick={(e) => { e.stopPropagation(); setResetPasswordId(s.id); setResetPasswordValue(""); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer" title="Reset Password"><KeyRound size={14} /></button>
                         <button onClick={(e) => startEdit(s, e)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer" title="Edit"><Pencil size={14} /></button>
                         <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(s.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" title="Delete"><Trash2 size={14} /></button>
@@ -399,6 +435,23 @@ export default function AdminStudentPage() {
       </Card>
 
       <QRStickerModal student={qrStudent} onClose={() => setQrStudent(null)} />
+
+      {fpStudent && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !fpSubmitting && setFpStudent(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                <Fingerprint size={18} className="text-indigo-600" /> Enroll Fingerprint
+              </h3>
+              <button onClick={() => !fpSubmitting && setFpStudent(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-slate-500 mb-2">
+              {fpStudent.fullName} <span className="font-mono text-xs text-indigo-600">({fpStudent.studentIdNo})</span>
+            </p>
+            <FingerprintScanner active={true} onScan={handleFingerprintScan} busy={fpSubmitting} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
