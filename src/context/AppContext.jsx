@@ -11,6 +11,7 @@ export function AppProvider({ children }) {
   const [announcements, setAnnouncements] = useState(INITIAL_ANNOUNCEMENTS);
   const [branches, setBranches] = useState([]);
   const [attendance, setAttendance] = useState([]);
+  const [attendancePage, setAttendancePage] = useState({ number: 0, totalPages: 0, totalElements: 0 });
   const [homeworkTasks, setHomeworkTasks] = useState([]);
 
   const fetchBranches = useCallback(async () => {
@@ -39,9 +40,18 @@ export function AppProvider({ children }) {
       const query = new URLSearchParams();
       if (params.branchId) query.set("branchId", params.branchId);
       if (params.date) query.set("date", params.date);
-      const qs = query.toString();
-      const res = await fetch(`${API}/attendance${qs ? `?${qs}` : ""}`);
-      if (res.ok) setAttendance(await res.json());
+      query.set("page", params.page ?? 0);
+      query.set("size", params.size ?? 50);
+      const res = await fetch(`${API}/attendance?${query.toString()}`);
+      if (res.ok) {
+        const pageData = await res.json();
+        setAttendance(pageData.content ?? []);
+        setAttendancePage({
+          number: pageData.number ?? 0,
+          totalPages: pageData.totalPages ?? 0,
+          totalElements: pageData.totalElements ?? 0,
+        });
+      }
     } catch { /* keep current state */ }
   }, []);
 
@@ -50,6 +60,19 @@ export function AppProvider({ children }) {
       const res = await fetch(`${API}/attendance/my?userId=${userId}`);
       if (res.ok) setAttendance(await res.json());
     } catch { /* keep current state */ }
+  }, []);
+
+  const markAttendanceBatch = useCallback(async (branchId, date, entries, markedByUserId) => {
+    const res = await fetch(`${API}/attendance/mark-batch?markedByUserId=${markedByUserId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ branchId, date, entries }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || "Failed to mark attendance");
+    }
+    return res.json();
   }, []);
 
   const fetchHomeworkTasks = useCallback(async (params = {}) => {
@@ -103,7 +126,7 @@ export function AppProvider({ children }) {
     staffMembers, setStaffMembers, fetchStaff,
     announcements, setAnnouncements,
     branches, setBranches, fetchBranches,
-    attendance, setAttendance, fetchAttendance, fetchMyAttendance,
+    attendance, setAttendance, attendancePage, fetchAttendance, fetchMyAttendance, markAttendanceBatch,
     homeworkTasks, setHomeworkTasks, fetchHomeworkTasks,
     fetchHomeworkByBranchDate, fetchMyHomework, fetchStudentView,
   };

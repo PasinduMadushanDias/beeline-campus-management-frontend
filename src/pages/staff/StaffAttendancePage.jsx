@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CalendarCheck, CheckCircle2, XCircle, Filter, Plus, X, Search, Send, ScanLine, Fingerprint } from "lucide-react";
+import { CalendarCheck, CheckCircle2, XCircle, Filter, Plus, X, Search, Send, ScanLine, Fingerprint, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
 import { PageHeader, Card, BranchBadge, MetricCard, SuccessToast } from "../../components/shared";
@@ -12,18 +12,30 @@ import { API_BASE_URL } from "../../config/api";
 const API = API_BASE_URL;
 
 export default function StaffAttendancePage() {
-  const { branches, students, fetchStudents, attendance, fetchAttendance } = useAppContext();
+  const { branches, students, fetchStudents, attendance, attendancePage, fetchAttendance, markAttendanceBatch } = useAppContext();
   const { user } = useAuth();
   const canMark = user?.canMarkAttendance;
 
   const [branchFilter, setBranchFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("");
+  const [pageIndex, setPageIndex] = useState(0);
   const [showForm, setShowForm] = useState(false);
-  const [mode, setMode] = useState("manual"); // "manual" | "scan" | "fingerprint"
+  const [mode, setMode] = useState("manual"); // "manual" | "scan" | "fingerprint" | "batch"
   const [fpBranchId, setFpBranchId] = useState("");
   // selectedStudentId holds the student's unique numeric id (not studentIdNo, which
   // is only unique per branch and can collide across branches in the dropdown).
   const [form, setForm] = useState({ selectedStudentId: "", date: new Date().toISOString().slice(0, 10), present: true });
+
+  const [batchBranchId, setBatchBranchId] = useState("");
+  const [batchDate, setBatchDate] = useState(new Date().toISOString().slice(0, 10));
+  const [batchPresence, setBatchPresence] = useState({}); // studentId -> boolean
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!batchBranchId && branches.length > 0) setBatchBranchId(branches[0].id.toString());
+  }, [branches, batchBranchId]);
+
+  const batchStudents = students.filter((s) => String(s.branchId) === batchBranchId);
 
   // Real students only, loaded from the database via AppContext (populated by Admin registration).
   useEffect(() => {
@@ -38,19 +50,27 @@ export default function StaffAttendancePage() {
   const [toast, setToast] = useState("");
 
   useEffect(() => {
-    const params = {};
+    const params = { page: pageIndex };
     if (branchFilter !== "All") {
       const branch = branches.find((b) => b.name === branchFilter);
       if (branch) params.branchId = branch.id;
     }
     if (dateFilter) params.date = dateFilter;
     fetchAttendance(params);
-  }, [branchFilter, dateFilter, fetchAttendance, branches]);
+  }, [branchFilter, dateFilter, pageIndex, fetchAttendance, branches]);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [branchFilter, dateFilter]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
-  const refreshTable = () =>
-    fetchAttendance(branchFilter !== "All" ? { branchId: branches.find((b) => b.name === branchFilter)?.id } : {});
+  const refreshTable = () => {
+    const params = { page: pageIndex };
+    if (branchFilter !== "All") params.branchId = branches.find((b) => b.name === branchFilter)?.id;
+    if (dateFilter) params.date = dateFilter;
+    return fetchAttendance(params);
+  };
 
   const handleMark = async (e) => {
     e.preventDefault();
@@ -149,6 +169,25 @@ export default function StaffAttendancePage() {
     }
   };
 
+  const handleBatchSubmit = async (e) => {
+    e.preventDefault();
+    if (!batchBranchId || !batchDate || batchStudents.length === 0) return;
+    setBatchSubmitting(true);
+    try {
+      const entries = batchStudents.map((s) => ({
+        studentId: s.id,
+        present: batchPresence[s.id] !== false,
+      }));
+      await markAttendanceBatch(parseInt(batchBranchId), batchDate, entries, user.id);
+      await refreshTable();
+      showToast(`Marked attendance for ${entries.length} students!`);
+    } catch (err) {
+      showToast(`Error: ${err.message}`);
+    } finally {
+      setBatchSubmitting(false);
+    }
+  };
+
   const present = attendance.filter((a) => a.present).length;
   const absent = attendance.filter((a) => !a.present).length;
 
@@ -181,6 +220,7 @@ export default function StaffAttendancePage() {
               {mode === "manual" && <><Send size={18} className="text-indigo-600" /> Mark Attendance by Student ID</>}
               {mode === "scan" && <><ScanLine size={18} className="text-indigo-600" /> Scan Student QR</>}
               {mode === "fingerprint" && <><Fingerprint size={18} className="text-indigo-600" /> Fingerprint Attendance</>}
+              {mode === "batch" && <><Users size={18} className="text-indigo-600" /> Mark Whole Class</>}
             </h3>
             <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1">
               <button
@@ -209,6 +249,15 @@ export default function StaffAttendancePage() {
                 }`}
               >
                 <Fingerprint size={13} /> Fingerprint
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("batch")}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors flex items-center gap-1.5 ${
+                  mode === "batch" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Users size={13} /> Whole Class
               </button>
             </div>
           </div>
@@ -274,11 +323,55 @@ export default function StaffAttendancePage() {
               <FingerprintScanner active={mode === "fingerprint"} onScan={handleFingerprintScan} busy={scanBusy} />
             </div>
           )}
+
+          {mode === "batch" && (
+            <form onSubmit={handleBatchSubmit} className="space-y-4">
+              <div className="flex flex-wrap items-end gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">Branch</label>
+                  <select value={batchBranchId} onChange={(e) => setBatchBranchId(e.target.value)}
+                    className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white w-56">
+                    {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">Date</label>
+                  <input type="date" value={batchDate} onChange={(e) => setBatchDate(e.target.value)} required
+                    className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+                </div>
+                <button type="submit" disabled={batchSubmitting || batchStudents.length === 0}
+                  className="px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center gap-2 cursor-pointer">
+                  <CheckCircle2 size={15} /> Submit for {batchStudents.length} students
+                </button>
+              </div>
+
+              <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                {batchStudents.map((s) => {
+                  const isPresent = batchPresence[s.id] !== false;
+                  return (
+                    <div key={s.id} className="flex items-center justify-between px-4 py-2 text-sm">
+                      <span className="text-slate-700">{s.studentIdNo} — {s.fullName}</span>
+                      <button type="button"
+                        onClick={() => setBatchPresence((prev) => ({ ...prev, [s.id]: !isPresent }))}
+                        className={`text-xs font-medium px-2.5 py-1 rounded-full cursor-pointer ${
+                          isPresent ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                        }`}>
+                        {isPresent ? "Present" : "Absent"}
+                      </button>
+                    </div>
+                  );
+                })}
+                {batchStudents.length === 0 && (
+                  <p className="text-xs text-slate-400 text-center py-6">No students found for this branch.</p>
+                )}
+              </div>
+            </form>
+          )}
         </Card>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <MetricCard icon={CalendarCheck} label="Total Records" value={attendance.length} color="blue" />
+        <MetricCard icon={CalendarCheck} label="Total Records" value={attendancePage.totalElements} color="blue" />
         <MetricCard icon={CheckCircle2} label="Present" value={present} color="green" />
         <MetricCard icon={XCircle} label="Absent" value={absent} color="rose" />
       </div>
@@ -296,7 +389,7 @@ export default function StaffAttendancePage() {
           {dateFilter && (
             <button onClick={() => setDateFilter("")} className="text-xs text-indigo-600 hover:underline cursor-pointer">Clear date</button>
           )}
-          <span className="text-xs text-slate-400 ml-auto">{attendance.length} records</span>
+          <span className="text-xs text-slate-400 ml-auto">{attendancePage.totalElements} records</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -336,6 +429,27 @@ export default function StaffAttendancePage() {
             </tbody>
           </table>
         </div>
+        {attendancePage.totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 text-sm">
+            <button
+              onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+              disabled={pageIndex === 0}
+              className="flex items-center gap-1 px-3 py-1.5 text-slate-500 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <ChevronLeft size={15} /> Previous
+            </button>
+            <span className="text-xs text-slate-400">
+              Page {attendancePage.number + 1} of {attendancePage.totalPages}
+            </span>
+            <button
+              onClick={() => setPageIndex((p) => Math.min(attendancePage.totalPages - 1, p + 1))}
+              disabled={pageIndex >= attendancePage.totalPages - 1}
+              className="flex items-center gap-1 px-3 py-1.5 text-slate-500 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Next <ChevronRight size={15} />
+            </button>
+          </div>
+        )}
       </Card>
     </div>
   );
