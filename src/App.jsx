@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { SIDEBAR_NAV, ROLE_ICONS } from "./constants";
 import { AppProvider } from "./context/AppContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -21,63 +22,57 @@ import StudentAttendancePage from "./pages/student/StudentAttendancePage";
 import StudentAssignmentsPage from "./pages/student/StudentAssignmentsPage";
 import StudentFeePage from "./pages/student/StudentFeePage";
 
-const ACTIVE_NAV_KEY = "beeline_active_nav";
-
 function AuthenticatedApp() {
   const { user, logout } = useAuth();
   const role = user.role;
   const navItems = SIDEBAR_NAV[role];
-
-  // Restore the last-viewed tab for this role on refresh, falling back to
-  // "dashboard" if nothing was stored or the stored value is no longer valid
-  // (e.g. after a role switch or a nav item being renamed).
-  const [activeNav, setActiveNav] = useState(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(ACTIVE_NAV_KEY) || "{}");
-      const candidate = stored[role];
-      return navItems?.some((item) => item.id === candidate) ? candidate : "dashboard";
-    } catch {
-      return "dashboard";
-    }
-  });
+  const base = `/${role.toLowerCase()}`;
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(ACTIVE_NAV_KEY) || "{}");
-      stored[role] = activeNav;
-      localStorage.setItem(ACTIVE_NAV_KEY, JSON.stringify(stored));
-    } catch {
-      // storage unavailable — persistence is best-effort, not required for the app to work
-    }
-  }, [role, activeNav]);
+  const location = useLocation();
+  const currentLabel = navItems.find((item) => location.pathname === `${base}/${item.id}`)?.label || "";
 
   const RoleIcon = ROLE_ICONS[role];
 
-  const renderContent = () => {
+  const renderRoutes = () => {
     if (role === "Admin") {
-      if (activeNav === "dashboard") return <AdminDashboardPage />;
-      if (activeNav === "students") return <AdminStudentPage />;
-      if (activeNav === "staff") return <AdminStaffPage />;
-      if (activeNav === "branches") return <AdminBranchPage />;
-      if (activeNav === "homework") return <AdminHomeworkPage />;
+      return (
+        <>
+          <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="students" element={<AdminStudentPage />} />
+          <Route path="staff" element={<AdminStaffPage />} />
+          <Route path="branches" element={<AdminBranchPage />} />
+          <Route path="homework" element={<AdminHomeworkPage />} />
+        </>
+      );
     }
     if (role === "Teacher") {
-      if (activeNav === "dashboard") return <TeacherDashboardPage />;
-      if (activeNav === "announcements") return <TeacherAnnouncementPage />;
-      if (activeNav === "schedule") return <TeacherSchedulePage />;
+      return (
+        <>
+          <Route path="dashboard" element={<TeacherDashboardPage />} />
+          <Route path="announcements" element={<TeacherAnnouncementPage />} />
+          <Route path="schedule" element={<TeacherSchedulePage />} />
+        </>
+      );
     }
     if (role === "Staff") {
-      if (activeNav === "dashboard") return <StaffDashboardPage />;
-      if (activeNav === "homework") return <StaffHomeworkPage />;
-      if (activeNav === "attendance") return <StaffAttendancePage />;
+      return (
+        <>
+          <Route path="dashboard" element={<StaffDashboardPage />} />
+          <Route path="homework" element={<StaffHomeworkPage />} />
+          <Route path="attendance" element={<StaffAttendancePage />} />
+        </>
+      );
     }
     if (role === "Student") {
-      if (activeNav === "dashboard") return <StudentDashboardPage />;
-      if (activeNav === "profile") return <StudentProfilePage />; // Added this line
-      if (activeNav === "my-attendance") return <StudentAttendancePage />;
-      if (activeNav === "assignments") return <StudentAssignmentsPage />;
-      if (activeNav === "fees") return <StudentFeePage />;
+      return (
+        <>
+          <Route path="dashboard" element={<StudentDashboardPage />} />
+          <Route path="profile" element={<StudentProfilePage />} />
+          <Route path="my-attendance" element={<StudentAttendancePage />} />
+          <Route path="assignments" element={<StudentAssignmentsPage />} />
+          <Route path="fees" element={<StudentFeePage />} />
+        </>
+      );
     }
     return null;
   };
@@ -89,8 +84,7 @@ function AuthenticatedApp() {
         <Sidebar
           role={role}
           navItems={navItems}
-          activeNav={activeNav}
-          setActiveNav={setActiveNav}
+          base={base}
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
           RoleIcon={RoleIcon}
@@ -100,14 +94,16 @@ function AuthenticatedApp() {
         <div className="flex-1 flex flex-col min-h-screen min-w-0">
           <Header
             role={role}
-            navItems={navItems}
-            activeNav={activeNav}
+            currentLabel={currentLabel}
             setSidebarOpen={setSidebarOpen}
             RoleIcon={RoleIcon}
             user={user}
           />
           <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
-            {renderContent()}
+            <Routes>
+              {renderRoutes()}
+              <Route path="*" element={<Navigate to={`${base}/dashboard`} replace />} />
+            </Routes>
           </main>
           <footer className="border-t border-slate-200 bg-white px-4 lg:px-6 py-3 flex items-center justify-between">
             <p className="text-xs text-slate-400">&copy; 2026 Beeline Advanced Diploma in English</p>
@@ -128,6 +124,23 @@ export default function App() {
 }
 
 function AppRoot() {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <AuthenticatedApp /> : <LoginPage />;
+  const { isAuthenticated, user } = useAuth();
+
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  const base = `/${user.role.toLowerCase()}`;
+  return (
+    <Routes>
+      <Route path="/login" element={<Navigate to={`${base}/dashboard`} replace />} />
+      <Route path={`${base}/*`} element={<AuthenticatedApp />} />
+      <Route path="*" element={<Navigate to={`${base}/dashboard`} replace />} />
+    </Routes>
+  );
 }

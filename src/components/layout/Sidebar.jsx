@@ -1,6 +1,7 @@
 import { X, LogOut } from "lucide-react";
+import { NavLink } from "react-router-dom";
 
-export default function Sidebar({ role, navItems, activeNav, setActiveNav, sidebarOpen, setSidebarOpen, RoleIcon, user, onLogout }) {
+export default function Sidebar({ role, navItems, base, sidebarOpen, setSidebarOpen, RoleIcon, user, onLogout }) {
   return (
     <aside className={`fixed lg:sticky top-0 left-0 z-50 lg:z-auto h-screen w-64 bg-slate-900 text-white flex flex-col transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
       <div className="p-5 border-b border-slate-700/50 flex items-center justify-between">
@@ -22,16 +23,13 @@ export default function Sidebar({ role, navItems, activeNav, setActiveNav, sideb
       </div>
 
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-        {navItems.map(item => {
-          const active = activeNav === item.id;
-          return (
-            <button key={item.id} onClick={() => { setActiveNav(item.id); setSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer ${active ? "bg-indigo-600 text-white font-medium" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
-              <item.icon size={18} />
-              {item.label}
-            </button>
-          );
-        })}
+        {navItems.map(item => (
+          <NavLink key={item.id} to={`${base}/${item.id}`} onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) => `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer ${isActive ? "bg-indigo-600 text-white font-medium" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
+            <item.icon size={18} />
+            {item.label}
+          </NavLink>
+        ))}
       </nav>
 
       <div className="px-3 pb-2">

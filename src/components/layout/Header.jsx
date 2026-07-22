@@ -1,8 +1,6 @@
 import { Menu } from "lucide-react";
 
-export default function Header({ role, navItems, activeNav, setSidebarOpen, RoleIcon, user }) {
-  const currentLabel = navItems.find(n => n.id === activeNav)?.label || "";
-
+export default function Header({ role, currentLabel, setSidebarOpen, RoleIcon, user }) {
   return (
     <header className="bg-white border-b border-slate-200 px-4 lg:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
       <div className="flex items-center gap-3">
